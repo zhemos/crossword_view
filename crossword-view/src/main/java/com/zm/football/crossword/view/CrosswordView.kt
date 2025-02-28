@@ -7,9 +7,13 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
+import kotlin.math.max
+import kotlin.math.min
 
-class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
+class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attrs),
+    ScaleGestureDetector.OnScaleGestureListener {
 
     private val logger = Logger(isDebug = true)
 
@@ -35,10 +39,13 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         arrayOf(1, 1, 1, 1, 1, 1),
     )
 
-
-    private val horizontalMarginForPortrait = 64f.px
-    private val verticalMarginForLandscape = 16f.px
+    private val isScalable = true//outside
+    private val horizontalMarginForPortrait = 16f.px
+    private val verticalMarginForLandscape = 8f.px
     private val touchSlop = 10f.px
+    private val scaleDetector = ScaleGestureDetector(context, this)
+    private val minScale = 0.8f
+    private val maxScale = 1.8f
 
     private var crosswordRectF = RectF()
     private var size = 0f
@@ -48,10 +55,22 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     private var crosswordY = 0f
     private var horizontalMargin = 0f
     private var verticalMargin = 0f
+    private var scaleFactor = 1f
+
+    fun scaleIn() {
+        scaleFactor += 0.1f
+        scale()
+    }
+
+    fun scaleOut() {
+        scaleFactor -= 0.1f
+        scale()
+    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         logger.log("draw $width $height")
+        canvas.scale(scaleFactor, scaleFactor)
         if (canvas.isPortrait) {
             size = (width - horizontalMarginForPortrait * 2) / crossword.size
             horizontalMargin = horizontalMarginForPortrait
@@ -76,6 +95,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         logger.log("$event")
+        scaleDetector.onTouchEvent(event)
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouchX = event.x
@@ -102,6 +122,18 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         return true
     }
 
+    override fun onScale(detector: ScaleGestureDetector): Boolean {
+        scaleFactor *= detector.scaleFactor
+        scale()
+        return true
+    }
+
+    override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+        return true
+    }
+
+    override fun onScaleEnd(detector: ScaleGestureDetector) {}
+
     private fun Canvas.redrawCrossword() {
         crossword.forEachIndexed { i, rows ->
             rows.forEachIndexed { j, column ->
@@ -114,6 +146,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     private fun move(event: MotionEvent, dx: Float, dy: Float) {
+        if (isScalable.not()) return
         logger.logError("move $size")
         val newX = crosswordX + dx
         val newY = crosswordY + dy
@@ -127,6 +160,16 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         )
         lastTouchX = event.x
         lastTouchY = event.y
+        invalidate()
+    }
+
+    private fun scale() {
+        if (isScalable.not()) {
+            scaleFactor = 1f
+            return
+        }
+        logger.logError("scale")
+        scaleFactor = max(minScale, min(scaleFactor, maxScale))
         invalidate()
     }
 
