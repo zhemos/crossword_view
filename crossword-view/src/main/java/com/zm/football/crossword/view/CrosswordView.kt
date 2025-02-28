@@ -37,6 +37,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
 
 
     private val horizontalMarginForPortrait = 64f.px
+    private val verticalMarginForLandscape = 16f.px
     private val touchSlop = 10f.px
 
     private var crosswordRectF = RectF()
@@ -47,32 +48,18 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     private var crosswordY = 0f
     private var horizontalMargin = 0f
     private var verticalMargin = 0f
-    private var isPortraitOrientation = true
-    private var wasMove = false
-    private var offsetX = 0f
-    private var offsetY = 0f
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         logger.log("draw $width $height")
-        isPortraitOrientation = canvas.isPortrait
-        size = if (isPortraitOrientation) {
-            (width - horizontalMarginForPortrait * 2) / crossword.size
+        if (canvas.isPortrait) {
+            size = (width - horizontalMarginForPortrait * 2) / crossword.size
+            horizontalMargin = horizontalMarginForPortrait
+            verticalMargin = height / 2f - crossword[0].size * size / 2f
         } else {
-            (height / crossword[0].size).toFloat()
-        }
-        horizontalMargin = if (isPortraitOrientation) {
-            horizontalMarginForPortrait
-        } else {
-            width / 2f - crossword.size * size / 2f
-        }
-        verticalMargin = if (isPortraitOrientation) {
-            height / 2f - crossword[0].size * size / 2f
-        } else 0f
-        if (wasMove.not()) {
-//            canvas.redrawCrossword()
-        } else {
-//            canvas.redrawCrossword()
+            size = (height - verticalMarginForLandscape * 2) / crossword[0].size
+            horizontalMargin = width / 2f - crossword.size * size / 2f
+            verticalMargin = verticalMarginForLandscape
         }
         crossword.forEachIndexed { i, rows ->
             rows.forEachIndexed { j, column ->
@@ -85,7 +72,6 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
                 )
             }
         }
-//        canvas.drawRect(crosswordX, crosswordY, size + crosswordX, size + crosswordY, paint2)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -117,17 +103,8 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     private fun Canvas.redrawCrossword() {
-        val horizontalMargin = 0f
-        val verticalMargin = 0f
         crossword.forEachIndexed { i, rows ->
             rows.forEachIndexed { j, column ->
-                kotlinDrawRect(
-                    left = i * size + horizontalMargin + crosswordX,
-                    top = j * size + verticalMargin + crosswordY,
-                    right = i * size + size + horizontalMargin + crosswordX,
-                    bottom = j * size + size + verticalMargin + crosswordY,
-                    paint = paint,
-                )
             }
         }
     }
@@ -138,11 +115,16 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
 
     private fun move(event: MotionEvent, dx: Float, dy: Float) {
         logger.logError("move $size")
-        wasMove = true
         val newX = crosswordX + dx
         val newY = crosswordY + dy
-        crosswordX = newX.coerceIn(0f, width - crossword.size * size - horizontalMargin)
-        crosswordY = newY.coerceIn(0f, height - crossword[0].size * size)
+        crosswordX = newX.coerceIn(
+            minimumValue = -horizontalMargin,
+            maximumValue = width - crossword.size * size - horizontalMargin,
+        )
+        crosswordY = newY.coerceIn(
+            minimumValue = -verticalMargin,
+            maximumValue = height - crossword[0].size * size - verticalMargin,
+        )
         lastTouchX = event.x
         lastTouchY = event.y
         invalidate()
