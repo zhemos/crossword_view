@@ -153,13 +153,14 @@ class SquareView(context: Context, attrs: AttributeSet?) : View(context, attrs),
         val currentSize = getCurrentSize()
         val offsetX = width / 2f - currentSize.width / 2f
         val offsetY = height / 2f - currentSize.height / 2f
+        val shift = if (scaleFactor <= 1f) 0f else 16f.px * scaleFactor
         crosswordX = newX.coerceIn(
-            minimumValue = (-currentSize.width + width - offsetX).coerceAtMost(maximumValue = -offsetX),
-            maximumValue = (width - currentSize.width - offsetX).coerceAtLeast(minimumValue = -offsetX),
+            minimumValue = (-currentSize.width + width - offsetX - shift).coerceAtMost(maximumValue = -offsetX),
+            maximumValue = (width - currentSize.width - offsetX).coerceAtLeast(minimumValue = -offsetX + shift),
         )
         crosswordY = newY.coerceIn(
-            minimumValue = (-currentSize.height + height - offsetY).coerceAtMost(maximumValue = -offsetY),
-            maximumValue = (height - currentSize.height - offsetY).coerceAtLeast(minimumValue = -offsetY),
+            minimumValue = (-currentSize.height + height - offsetY - shift).coerceAtMost(maximumValue = -offsetY),
+            maximumValue = (height - currentSize.height - offsetY).coerceAtLeast(minimumValue = -offsetY + shift),
         )
         lastTouchX = event.x
         lastTouchY = event.y

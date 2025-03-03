@@ -4,8 +4,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.SizeF
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -27,35 +27,30 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         style = Paint.Style.FILL
     }
 
-    //8x6
-    private val crossword = arrayOf(
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-        arrayOf(1, 1, 1, 1, 1, 1),
-    )
-
     private val isScalable = true//outside
-    private val horizontalMarginForPortrait = 0f.px
-    private val verticalMarginForLandscape = 8f.px
-    private val touchSlop = 10f.px
-    private val scaleDetector = ScaleGestureDetector(context, this)
-    private val minScale = 0.8f
-    private val maxScale = 1.8f
 
-    private var crosswordRectF = RectF()
-    private var size = 0f
+    private val touchSlop = 10f.px
+    private val minScale = 0.1f
+    private val maxScale = 10f
+    private val scaleDetector = ScaleGestureDetector(context, this)
+    private val scaleMargin = 4f.px
+    private val margin = 16f.px
+    private val padding = 1f.px
+    private val minCellSize = 16f.px
+    private val maxCellSize = 56f.px
+
+    private var crossword = arrayOf<Array<Int>>()
+    private var wasScale = false
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var crosswordX = 0f
     private var crosswordY = 0f
-    private var horizontalMargin = 0f
-    private var verticalMargin = 0f
     private var scaleFactor = 1f
+
+    fun update(crossword: Array<Array<Int>>) {
+        this.crossword = crossword
+        invalidate()
+    }
 
     fun scaleIn() {
         scaleFactor += 0.1f
@@ -70,26 +65,18 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         logger.log("draw $width $height")
-        if (canvas.isPortrait) {
-            size = (width - horizontalMarginForPortrait * 2) / crossword.size
-            horizontalMargin = horizontalMarginForPortrait
-            verticalMargin = height / 2f - crossword[0].size * size / 2f
-        } else {
-            size = (height - verticalMarginForLandscape * 2) / crossword[0].size
-            horizontalMargin = width / 2f - crossword.size * size / 2f
-            verticalMargin = verticalMarginForLandscape
-        }
-        val scaleX = crosswordX + size * scaleFactor / 2
-        canvas.scale(scaleFactor, scaleFactor, 0f, 0f)
+        val cellSize = getCurrentCellSize()
+        val currentSize = getCurrentSize(cellSize)
+        logger.log("draw ${currentSize.width} ${currentSize.height}")
+        val offsetX = width / 2f - currentSize.width / 2f
+        val offsetY = height / 2f - currentSize.height / 2f
         crossword.forEachIndexed { i, rows ->
             rows.forEachIndexed { j, column ->
-                val right = i * size + size + horizontalMargin + crosswordX
-                if (i == 7 && j == 0) logger.log("right = $right")
                 canvas.kotlinDrawRect(
-                    left = i * size + horizontalMargin + crosswordX,
-                    top = j * size + verticalMargin + crosswordY,
-                    right = right,
-                    bottom = j * size + size + verticalMargin + crosswordY,
+                    left = i * cellSize + crosswordX + offsetX,
+                    top = j * cellSize + crosswordY + offsetY,
+                    right = i * cellSize + cellSize + crosswordX + offsetX,
+                    bottom = j * cellSize + cellSize + crosswordY + offsetY,
                     paint = paint,
                 )
             }
@@ -114,6 +101,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
                 }
             }
             MotionEvent.ACTION_UP -> {
+                wasScale = false
                 performClick()
             }
         }
@@ -132,6 +120,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+        wasScale = true
         return true
     }
 
@@ -149,27 +138,23 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     }
 
     private fun move(event: MotionEvent, dx: Float, dy: Float) {
-        if (isScalable.not()) return
+        if (isScalable.not() || wasScale) return
         logger.logError("move")
         val newX = crosswordX + dx
         val newY = crosswordY + dy
-        logger.log("$newX")
-        val currentWidth = getCurrentWidth()
-        val minX = (width - currentWidth).coerceAtMost(0f) / 2
-        val maxX = width - currentWidth - minX
-//        crosswordX = newX.coerceIn(
-//            minimumValue = -horizontalMargin,
-//            maximumValue = width - crossword.size * size * scaleFactor - horizontalMargin,
-//        )
+        val cellSize = getCurrentCellSize()
+        val currentSize = getCurrentSize(cellSize)
+        val offsetX = width / 2f - currentSize.width / 2f
+        val offsetY = height / 2f - currentSize.height / 2f
+        val shift = if (scaleFactor <= 1f) 0f else scaleMargin * scaleFactor
         crosswordX = newX.coerceIn(
-            minimumValue = minX,
-            maximumValue = maxX,
+            minimumValue = (-currentSize.width + width - offsetX - shift).coerceAtMost(maximumValue = -offsetX),
+            maximumValue = (width - currentSize.width - offsetX).coerceAtLeast(minimumValue = -offsetX + shift),
         )
         crosswordY = newY.coerceIn(
-            minimumValue = -verticalMargin,
-            maximumValue = height - crossword[0].size * size - verticalMargin,
+            minimumValue = (-currentSize.height + height - offsetY - shift).coerceAtMost(maximumValue = -offsetY),
+            maximumValue = (height - currentSize.height - offsetY).coerceAtLeast(minimumValue = -offsetY + shift),
         )
-        logger.log("move $crosswordX $crosswordY")//-42.0 -727.0 42.0 -727.0
         lastTouchX = event.x
         lastTouchY = event.y
         invalidate()
@@ -185,9 +170,25 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         invalidate()
     }
 
-    private fun getCurrentWidth() = crossword.size * size * scaleFactor
+    private fun getCurrentCellSize(): Float {
+        val size = if (height >= width) {
+            (width - margin * 2) / crossword.size
+        } else {
+            val columnSize = crossword.firstOrNull()?.size ?: return 0f
+            (height / columnSize).toFloat()
+        }.coerceIn(
+            minimumValue = minCellSize,
+            maximumValue = maxCellSize,
+        )
+        return size * scaleFactor
+    }
 
-    private val Canvas.isPortrait get() = height >= width
+    private fun getCurrentSize(cellSize: Float): SizeF {
+        val columnSize = crossword.firstOrNull()?.size ?: return SizeF(0f, 0f)
+        val width = cellSize * crossword.size
+        val height = cellSize * columnSize
+        return SizeF(width, height)
+    }
 
     private val Float.px get() = this * context.resources.displayMetrics.density
 
@@ -198,11 +199,4 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         bottom: Float,
         paint: Paint,
     ) = this.drawRect(left, top, right, bottom, paint)
-
-    private fun genRectF(
-        left: Float,
-        top: Float,
-        right: Float,
-        bottom: Float,
-    ) = RectF(left, top, right, bottom)
 }
