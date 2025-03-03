@@ -40,7 +40,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     )
 
     private val isScalable = true//outside
-    private val horizontalMarginForPortrait = 16f.px
+    private val horizontalMarginForPortrait = 0f.px
     private val verticalMarginForLandscape = 8f.px
     private val touchSlop = 10f.px
     private val scaleDetector = ScaleGestureDetector(context, this)
@@ -70,7 +70,6 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         logger.log("draw $width $height")
-        canvas.scale(scaleFactor, scaleFactor)
         if (canvas.isPortrait) {
             size = (width - horizontalMarginForPortrait * 2) / crossword.size
             horizontalMargin = horizontalMarginForPortrait
@@ -80,12 +79,16 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
             horizontalMargin = width / 2f - crossword.size * size / 2f
             verticalMargin = verticalMarginForLandscape
         }
+        val scaleX = crosswordX + size * scaleFactor / 2
+        canvas.scale(scaleFactor, scaleFactor, 0f, 0f)
         crossword.forEachIndexed { i, rows ->
             rows.forEachIndexed { j, column ->
+                val right = i * size + size + horizontalMargin + crosswordX
+                if (i == 7 && j == 0) logger.log("right = $right")
                 canvas.kotlinDrawRect(
                     left = i * size + horizontalMargin + crosswordX,
                     top = j * size + verticalMargin + crosswordY,
-                    right = i * size + size + horizontalMargin + crosswordX,
+                    right = right,
                     bottom = j * size + size + verticalMargin + crosswordY,
                     paint = paint,
                 )
@@ -147,17 +150,26 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
 
     private fun move(event: MotionEvent, dx: Float, dy: Float) {
         if (isScalable.not()) return
-        logger.logError("move $size")
+        logger.logError("move")
         val newX = crosswordX + dx
         val newY = crosswordY + dy
+        logger.log("$newX")
+        val currentWidth = getCurrentWidth()
+        val minX = (width - currentWidth).coerceAtMost(0f) / 2
+        val maxX = width - currentWidth - minX
+//        crosswordX = newX.coerceIn(
+//            minimumValue = -horizontalMargin,
+//            maximumValue = width - crossword.size * size * scaleFactor - horizontalMargin,
+//        )
         crosswordX = newX.coerceIn(
-            minimumValue = -horizontalMargin,
-            maximumValue = width - crossword.size * size - horizontalMargin,
+            minimumValue = minX,
+            maximumValue = maxX,
         )
         crosswordY = newY.coerceIn(
             minimumValue = -verticalMargin,
             maximumValue = height - crossword[0].size * size - verticalMargin,
         )
+        logger.log("move $crosswordX $crosswordY")//-42.0 -727.0 42.0 -727.0
         lastTouchX = event.x
         lastTouchY = event.y
         invalidate()
@@ -172,6 +184,8 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         scaleFactor = max(minScale, min(scaleFactor, maxScale))
         invalidate()
     }
+
+    private fun getCurrentWidth() = crossword.size * size * scaleFactor
 
     private val Canvas.isPortrait get() = height >= width
 
