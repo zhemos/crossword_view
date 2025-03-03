@@ -65,8 +65,8 @@ class SquareView(context: Context, attrs: AttributeSet?) : View(context, attrs),
         super.onDraw(canvas)
         logger.log("draw $width $height")
         val currentSize = getCurrentSize()
-        val centerX = width / 2f
-        val centerY = height / 2f
+        val offsetX = width / 2f - currentSize.width / 2f
+        val offsetY = height / 2f - currentSize.height / 2f
 //        canvas.translate(centerX, centerY)
 //        canvas.kotlinDrawRect(
 //            left = crosswordX,
@@ -97,10 +97,10 @@ class SquareView(context: Context, attrs: AttributeSet?) : View(context, attrs),
 //            paint = paint2,
 //        )
         canvas.kotlinDrawRect(
-            left = crosswordX + width / 2f - currentSize.width / 2f,
-            top = crosswordY + width / 2f - currentSize.width / 2f,
-            right = crosswordX + currentSize.width + width / 2f - currentSize.width / 2f,
-            bottom = crosswordY + currentSize.height + width / 2f - currentSize.width / 2f,
+            left = crosswordX + offsetX,
+            top = crosswordY + offsetY,
+            right = crosswordX + currentSize.width + offsetX,
+            bottom = crosswordY + currentSize.height + offsetY,
             paint = paint3,
         )
     }
