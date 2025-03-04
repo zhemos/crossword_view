@@ -11,7 +11,6 @@ import android.util.SizeF
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
-import kotlin.math.log
 import kotlin.math.max
 import kotlin.math.min
 
@@ -25,12 +24,20 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         style = Paint.Style.STROKE
         strokeWidth = 1.5f.px
     }
-    private val paintEmptySolid = Paint().apply {
+    private val paintSimple = Paint().apply {
         color = Color.WHITE
         style = Paint.Style.FILL
     }
-    private val paintFill = Paint().apply {
+    private val paintFrozen = Paint().apply {
         color = Color.RED
+        style = Paint.Style.FILL
+    }
+    private val paintFocused = Paint().apply {
+        color = Color.GRAY
+        style = Paint.Style.FILL
+    }
+    private val paintFocusedLikeWord = Paint().apply {
+        color = Color.DKGRAY
         style = Paint.Style.FILL
     }
     private val textPaint = Paint().apply {
@@ -51,7 +58,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     private val maxCellSize = 56f.px
     private val textBounds = Rect()
 
-    private var crossword = arrayOf<Array<out Cell>>()
+    private var crossword = arrayOf<Array<Cell>>()
     private var rowCount: Int = 0
     private var colCount: Int = 0
     private var wasScale = false
@@ -65,7 +72,7 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     private var listener: OnClickCellListener? = null
 
     fun update(
-        crossword: Array<Array<out Cell>>,
+        crossword: Array<Array<Cell>>,
         rowCount: Int = crossword.size,
         colCount: Int = crossword.firstOrNull()?.size ?: 0,
     ) {
@@ -91,23 +98,11 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        logger.log("draw $width $height")
         val cellSize = getCurrentCellSize()
         val currentSize = getCurrentSize(cellSize)
         val offsetX = width / 2f - currentSize.width / 2f
         val offsetY = height / 2f - currentSize.height / 2f
         canvas.drawCrossword(cellSize, offsetX, offsetY)
-        crossword.forEachIndexed { x, rows ->
-            rows.forEachIndexed { y, cell ->
-//                canvas.kotlinDrawRect(
-//                    left = i * cellSize + crosswordX + offsetX,
-//                    top = j * cellSize + crosswordY + offsetY,
-//                    right = i * cellSize + cellSize + crosswordX + offsetX,
-//                    bottom = j * cellSize + cellSize + crosswordY + offsetY,
-//                    paint = paint,
-//                )
-            }
-        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -163,17 +158,18 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
     ) {
         for (col in 0 until colCount) {
             for (row in 0 until rowCount) {
-                when (val cell = crossword[row][col]) {
-                    Cell.Focusable.Empty -> {
-                        drawCell(col, row, cellSize, offsetX, offsetY, paintEmptySolid)
-                        drawCell(col, row, cellSize, offsetX, offsetY, paintStroke)
-                    }
-                    is Cell.Fill -> {
-                        drawCell(col, row, cellSize, offsetX, offsetY, paintFill)
-                        drawLetter(col, row, cellSize, offsetX, offsetY, cell.letter.uppercaseChar())
-                        drawCell(col, row, cellSize, offsetX, offsetY, paintStroke)
-                    }
-                    Cell.None -> {}
+                val cell = crossword[row][col]
+                val paint = when (cell) {
+                    is Cell.Focusable.Focused -> paintFocused
+                    is Cell.Focusable.FocusedLikeWord -> paintFocusedLikeWord
+                    is Cell.Focusable.Simple -> paintSimple
+                    is Cell.Frozen -> paintFrozen
+                    Cell.None -> null
+                }
+                paint?.let {
+                    drawCell(col, row, cellSize, offsetX, offsetY, it)
+                    drawCell(col, row, cellSize, offsetX, offsetY, paintStroke)
+                    drawLetter(col, row, cellSize, offsetX, offsetY, cell.letter.uppercaseChar())
                 }
             }
         }
@@ -217,12 +213,15 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         val currentSize = getCurrentSize(cellSize)
         val offsetX = width / 2f - currentSize.width / 2f
         val offsetY = height / 2f - currentSize.height / 2f
-        val touchX = (event.x - crosswordX - offsetX) / scaleFactor
-        val touchY = (event.y - crosswordY - offsetY) / scaleFactor
+        val touchX = (event.x - crosswordX - offsetX) / 1f
+        val touchY = (event.y - crosswordY - offsetY) / 1f
         val column = (touchX / cellSize).toInt()
         val row = (touchY / cellSize).toInt()
+        logger.log("${event.x} ${event.y}")
+        logger.log("$column $row")
         if (row in crossword.indices && column in 0 until crossword[0].size) {
             listener?.onCell(row, column)
+            logger.log("listener")
         }
     }
 
@@ -290,29 +289,6 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         bottom: Float,
         paint: Paint,
     ) = this.drawRect(left, top, right, bottom, paint)
-
-    private fun Canvas.test() {
-        val squareSize = 200f
-        val squareX = (width - squareSize) / 2
-        val squareY = (height - squareSize) / 2
-        val squarePaint = Paint().apply {
-            color = Color.LTGRAY
-            style = Paint.Style.FILL
-        }
-        drawRect(squareX, squareY, squareX + squareSize, squareY + squareSize, squarePaint)
-        val text  = "A"
-        val textPaint = Paint().apply {
-            color = Color.BLACK
-            textSize = squareSize / 2  // Размер текста относительно квадрата
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val textBounds = Rect()
-        textPaint.getTextBounds(text, 0, text.length, textBounds)
-        val textX = squareX + squareSize / 2
-        val textY = squareY + squareSize / 2 - (textBounds.top + textBounds.bottom) / 2
-        drawText(text, textX, textY, textPaint)
-    }
 
     interface OnClickCellListener {
         fun onCell(x: Int, y: Int)

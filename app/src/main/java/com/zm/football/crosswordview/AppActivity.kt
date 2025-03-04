@@ -8,19 +8,21 @@ import com.zm.football.crossword.view.Cell
 import com.zm.football.crossword.view.CrosswordView
 
 typealias None = Cell.None
-typealias Empty = Cell.Focusable.Empty
-typealias Fill = Cell.Fill
+typealias Simple = Cell.Focusable.Simple
+typealias Focused = Cell.Focusable.Focused
+typealias FocusedLikeWord = Cell.Focusable.FocusedLikeWord
+typealias Frozen = Cell.Frozen
 
 class AppActivity : AppCompatActivity(R.layout.activity_app), CrosswordView.OnClickCellListener {
 
     private lateinit var crosswordView: CrosswordView
 
-    private val crossword: Array<Array<out Cell>> = arrayOf(
-        arrayOf(None,  None,  Empty, None,  None),
-        arrayOf(None,  None,  Empty, None,  None),
-        arrayOf(Empty, Empty, Empty, Empty, Fill('a')),
-        arrayOf(None,  None,  Empty, None,  None),
-        arrayOf(None,  None,  Empty, None,  None),
+    private val crossword: Array<Array<Cell>> = arrayOf(
+        arrayOf(FocusedLikeWord(),  FocusedLikeWord(),  Focused(), FocusedLikeWord(),  FocusedLikeWord()),
+        arrayOf(None,  None,  Simple(), None,  None),
+        arrayOf(Frozen('a'), Frozen('b'), Frozen('c'), Frozen('d'), Frozen('e')),
+        arrayOf(None,  None,  Simple('c'), None,  None),
+        arrayOf(None,  None,  Simple('s'), None,  None),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,6 +31,7 @@ class AppActivity : AppCompatActivity(R.layout.activity_app), CrosswordView.OnCl
         crosswordView.setOnClickCellListener(this)
         findViewById<TextView>(R.id.btn_minus).setOnClickListener { crosswordView.scaleOut() }
         findViewById<TextView>(R.id.btn_plus).setOnClickListener { crosswordView.scaleIn() }
+        findViewById<TextView>(R.id.btn_writer).setOnClickListener {  }
         crosswordView.update(crossword)
     }
 
