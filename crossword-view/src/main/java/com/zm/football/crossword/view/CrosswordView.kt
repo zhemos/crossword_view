@@ -213,8 +213,8 @@ class CrosswordView(context: Context, attrs: AttributeSet?) : View(context, attr
         val currentSize = getCurrentSize(cellSize)
         val offsetX = width / 2f - currentSize.width / 2f
         val offsetY = height / 2f - currentSize.height / 2f
-        val touchX = (event.x - crosswordX - offsetX) / 1f
-        val touchY = (event.y - crosswordY - offsetY) / 1f
+        val touchX = event.x - crosswordX - offsetX
+        val touchY = event.y - crosswordY - offsetY
         val column = (touchX / cellSize).toInt()
         val row = (touchY / cellSize).toInt()
         logger.log("${event.x} ${event.y}")
